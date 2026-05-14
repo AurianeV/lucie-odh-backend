@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import nodemailer from "nodemailer";
+import brevo from "@getbrevo/brevo";
 
 dotenv.config();
 
@@ -38,28 +38,21 @@ const escapeHTML = (str) => {
 };
 
 /* =========================
-   Nodemailer (Brevo SMTP)
+ (Brevo SMTP)
 ========================= */
-const transporter = nodemailer.createTransport({
-  host: "smtp-relay.brevo.com",
-  port: 465,
-  secure: false,
-  auth: {
-    user: process.env.BREVO_SMTP_USER,
-    pass: process.env.BREVO_SMTP_KEY
-  },
-  connectionTimeout: 30000,
-  greetingTimeout: 30000,
-  socketTimeout: 30000
+const apiInstance = new brevo.TransactionalEmailsApi();
 
-});
-transporter.verify(function(error, success) {
-  if (error) {
-    console.log("Erreur SMTP :", error);
-  } else {
-    console.log("SMTP prêt ✅");
-  }
-});
+apiInstance.setApiKey(
+  brevo.TransactionalEmailsApiApiKeys.apiKey,
+  process.env.BREVO_API_KEY
+);
+  transporter.verify(function(error, success) {
+    if (error) {
+      console.log("Erreur SMTP :", error);
+    } else {
+      console.log("SMTP prêt ✅");
+    }
+  });
 
 /* =========================
    Route test
@@ -93,26 +86,29 @@ app.post("/questionnaire", async (req, res) => {
       )
       .join("");
 
-    const info = await transporter.sendMail({
-      from: `"Lucie ODH" <${process.env.BREVO_FROM_EMAIL}>`,
-      to: process.env.BREVO_TO_EMAIL,
-      replyTo: email,
-      subject: `📩 ${escapeHTML(type)} - Nouvelle réponse questionnaire `,
-      html: `
+    await apiInstance.sendTransacEmail({
+      sender: {
+        name: "Lucie ODH",
+        email: process.env.BREVO_FROM_EMAIL,
+      },
+      to: [
+        {
+          email: process.env.BREVO_TO_EMAIL,
+        },
+      ],
+      replyTo: {
+        email: email,
+      },
+      subject: `📩 ${escapeHTML(type)} - Nouvelle réponse questionnaire`,
+      htmlContent: `
         <h2>${escapeHTML(type)}</h2>
         <p><strong>Nom :</strong> ${escapeHTML(nom)}</p>
         <p><strong>Email :</strong> ${escapeHTML(email)}</p>
         <h3>Réponses :</h3>
-        <ul>
-          ${formattedResponses}
-        </ul>
-      `
-    });
+        <ul>${formattedResponses}</ul>
+      `,
+});
 
-console.log("Email envoyé :", info.messageId);
-console.log("Accepté par :", info.accepted);
-console.log("Refusé par :", info.rejected);
-console.log("Réponse SMTP :", info.response);
 
 res.json({ success: true });
 
