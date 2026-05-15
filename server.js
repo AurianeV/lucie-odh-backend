@@ -16,7 +16,7 @@ const corsOptions = {
     "http://localhost:5173",
     "http://localhost:5174"
   ],
-  methods: ["POST"],
+  methods: ["POST", "GET", "OPTIONS"],
   allowedHeaders: ["Content-Type"]
 };
 
