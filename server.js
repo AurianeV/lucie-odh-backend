@@ -1,7 +1,6 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import brevo from "@getbrevo/brevo";
 
 dotenv.config();
 
@@ -38,21 +37,9 @@ const escapeHTML = (str) => {
 };
 
 /* =========================
- (Brevo SMTP)
+ (Brevo API)
 ========================= */
-const apiInstance = new brevo.TransactionalEmailsApi();
 
-apiInstance.setApiKey(
-  brevo.TransactionalEmailsApiApiKeys.apiKey,
-  process.env.BREVO_API_KEY
-);
-  transporter.verify(function(error, success) {
-    if (error) {
-      console.log("Erreur SMTP :", error);
-    } else {
-      console.log("SMTP prêt ✅");
-    }
-  });
 
 /* =========================
    Route test
@@ -86,28 +73,42 @@ app.post("/questionnaire", async (req, res) => {
       )
       .join("");
 
-    await apiInstance.sendTransacEmail({
-      sender: {
-        name: "Lucie ODH",
-        email: process.env.BREVO_FROM_EMAIL,
+    const brevoResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
+  method: "POST",
+  headers: {
+    "accept": "application/json",
+    "api-key": process.env.BREVO_API_KEY,
+    "content-type": "application/json",
+  },
+  body: JSON.stringify({
+    sender: {
+      name: "Lucie ODH",
+      email: process.env.BREVO_FROM_EMAIL,
+    },
+    to: [
+      {
+        email: process.env.BREVO_TO_EMAIL,
       },
-      to: [
-        {
-          email: process.env.BREVO_TO_EMAIL,
-        },
-      ],
-      replyTo: {
-        email: email,
-      },
-      subject: `📩 ${escapeHTML(type)} - Nouvelle réponse questionnaire`,
-      htmlContent: `
-        <h2>${escapeHTML(type)}</h2>
-        <p><strong>Nom :</strong> ${escapeHTML(nom)}</p>
-        <p><strong>Email :</strong> ${escapeHTML(email)}</p>
-        <h3>Réponses :</h3>
-        <ul>${formattedResponses}</ul>
-      `,
+    ],
+    replyTo: {
+      email: email,
+    },
+    subject: `📩 ${escapeHTML(type)} - Nouvelle réponse questionnaire`,
+    htmlContent: `
+      <h2>${escapeHTML(type)}</h2>
+      <p><strong>Nom :</strong> ${escapeHTML(nom)}</p>
+      <p><strong>Email :</strong> ${escapeHTML(email)}</p>
+      <h3>Réponses :</h3>
+      <ul>${formattedResponses}</ul>
+    `,
+  }),
 });
+
+if (!brevoResponse.ok) {
+  const errorText = await brevoResponse.text();
+  console.error("Erreur Brevo API :", errorText);
+  return res.status(500).json({ error: "Erreur envoi email" });
+}
 
 
 res.json({ success: true });
